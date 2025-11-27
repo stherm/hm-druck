@@ -1,0 +1,4 @@
+test/input/**
+test/output/**
+__pycache__
+result

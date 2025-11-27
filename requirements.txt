@@ -1,0 +1,6 @@
+pypdf2
+reportlab
+pyinstaller
+pywin32
+tk
+

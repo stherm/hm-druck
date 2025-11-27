@@ -1,0 +1,66 @@
+name: Build Windows EXE & Release
+
+on:
+  push:
+    branches: [master]
+  workflow_dispatch: {}
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+
+    permissions:
+      contents: write # ⬅️ Das erlaubt dem GITHUB_TOKEN Releases/Tags zu erstellen
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Build EXE with PyInstaller
+        run: |
+          pyinstaller --onefile --windowed --name "HM-Druck" --icon "assets\\hm-druck.ico" main.py
+
+      - name: Show dist directory
+        run: |
+          echo "Current directory:"
+          echo $PWD
+          echo "Files:"
+          dir
+          echo "dist contents:"
+          dir dist
+
+      - name: Upload dist folder as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: HM-Druck-windows
+          path: dist/**
+
+      - name: Create GitHub Release
+        id: create_release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: build-${{ github.run_number }}
+          name: "HM-Druck build #${{ github.run_number }}"
+          prerelease: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload EXE to Release
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: dist/HM-Druck.exe
+          asset_name: HM-Druck-${{ github.run_number }}.exe
+          asset_content_type: application/octet-stream
