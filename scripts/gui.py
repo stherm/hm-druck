@@ -3,15 +3,15 @@ import platform
 import tkinter as tk
 from tkinter import ttk, filedialog, messagebox, scrolledtext
 
-from sort import collect_pages_by_size, write_imposed_pdfs
-from config import load_config, save_config
+from .sort import collect_pages_by_size, write_imposed_pdfs
+from .config import load_config, save_config
 
 WINDOWS = platform.system() == "Windows"
 
 print_module = None
 if WINDOWS:
     try:
-        import print as print_module
+        from . import print as print_module
     except Exception as e:
         print("Could not import print module:", e)
         print_module = None
@@ -20,8 +20,9 @@ if WINDOWS:
 class PdfSortPrintGUI:
     def __init__(self, root: tk.Tk):
         self.root = root
-        self.root.title("HM – PDF Sort & Print")
+        self.root.title("HM – PDF sortieren & drucken")
 
+        # Konfiguration laden
         self.config = load_config()
 
         self.root.geometry("900x520")
@@ -32,6 +33,10 @@ class PdfSortPrintGUI:
         self._center_window()
 
         self.root.protocol("WM_DELETE_WINDOW", self._on_close)
+
+    # ---------------------------------------------------------
+    # Styling / Layout
+    # ---------------------------------------------------------
 
     def _configure_style(self):
         style = ttk.Style()
@@ -54,19 +59,21 @@ class PdfSortPrintGUI:
         self.root.columnconfigure(0, weight=1)
         self.root.rowconfigure(1, weight=1)
 
+        # Header
         header_frame = ttk.Frame(self.root, style="Main.TFrame")
         header_frame.grid(row=0, column=0, sticky="ew", padx=16, pady=(12, 4))
 
-        header_label = ttk.Label(header_frame, text="PDF Sort & Print", style="Header.TLabel")
+        header_label = ttk.Label(header_frame, text="PDF sortieren & drucken", style="Header.TLabel")
         header_label.grid(row=0, column=0, sticky="w")
 
         subheader_label = ttk.Label(
             header_frame,
-            text="Sort PDF pages by size, impose 2-up (A1→A0, A3→A2, A5→A4) and optionally print.",
+            text="PDF-Seiten nach Format sortieren, 2-up montieren (A1→A0, A3→A2, A5→A4) und optional drucken.",
             style="SubHeader.TLabel",
         )
         subheader_label.grid(row=1, column=0, sticky="w", pady=(2, 0))
 
+        # Hauptbereich
         main_frame = ttk.Frame(self.root, style="Main.TFrame")
         main_frame.grid(row=1, column=0, sticky="nsew", padx=16, pady=8)
         main_frame.columnconfigure(0, weight=1)
@@ -76,11 +83,12 @@ class PdfSortPrintGUI:
         self._build_left_printer_panel(main_frame)
         self._build_right_job_panel(main_frame)
 
+        # Statusleiste
         status_frame = ttk.Frame(self.root)
         status_frame.grid(row=2, column=0, sticky="ew")
         status_frame.columnconfigure(0, weight=1)
 
-        self.status_var = tk.StringVar(value="Ready.")
+        self.status_var = tk.StringVar(value="Bereit.")
         status_label = ttk.Label(
             status_frame,
             textvariable=self.status_var,
@@ -103,9 +111,12 @@ class PdfSortPrintGUI:
         y = int((sh - h) / 3)
         self.root.geometry(f"{w}x{h}+{x}+{y}")
 
+    # ---------------------------------------------------------
+    # Linkes Panel: Drucker
+    # ---------------------------------------------------------
 
     def _build_left_printer_panel(self, parent):
-        frame = ttk.LabelFrame(parent, text="Printers (A0 / A2 / A3 / A4)")
+        frame = ttk.LabelFrame(parent, text="Drucker (A0 / A2 / A3 / A4)")
         frame.grid(row=0, column=0, padx=(0, 8), pady=4, sticky="nsew")
         frame.columnconfigure(1, weight=1)
 
@@ -116,7 +127,7 @@ class PdfSortPrintGUI:
 
         row = 0
         for fmt in ["A0", "A2", "A3", "A4"]:
-            ttk.Label(frame, text=f"{fmt} printer:").grid(
+            ttk.Label(frame, text=f"{fmt}-Drucker:").grid(
                 row=row, column=0, padx=6, pady=6, sticky="w"
             )
             combo = ttk.Combobox(
@@ -138,7 +149,7 @@ class PdfSortPrintGUI:
 
         info_text = ""
         if not WINDOWS or print_module is None:
-            info_text = "Printing available only on Windows with printer support."
+            info_text = "Drucken ist nur unter Windows mit eingerichtetem Drucker verfügbar."
         elif self.printer_values and self.printer_values[0].startswith("["):
             info_text = self.printer_values[0]
 
@@ -156,53 +167,57 @@ class PdfSortPrintGUI:
             try:
                 printers = print_module.get_installed_printers()
                 if not printers:
-                    return ["[No printers found]"]
+                    return ["[Keine Drucker gefunden]"]
                 return printers
             except Exception as e:
                 print("Error getting printers:", e)
-                return ["[Error loading printers]"]
+                return ["[Fehler beim Laden der Drucker]"]
         else:
-            return ["[Windows printers not available]"]
+            return ["[Windows-Drucker nicht verfügbar]"]
 
+    # ---------------------------------------------------------
+    # Rechtes Panel: Job-Einstellungen
+    # ---------------------------------------------------------
 
     def _build_right_job_panel(self, parent):
-        frame = ttk.LabelFrame(parent, text="Job settings")
+        frame = ttk.LabelFrame(parent, text="Auftragseinstellungen")
         frame.grid(row=0, column=1, padx=(8, 0), pady=4, sticky="nsew")
         frame.columnconfigure(1, weight=1)
         frame.rowconfigure(3, weight=1)
 
-        # Source mit gespeicherter Config vorbelegen
         last_source = self.config.get("last_source", "")
         last_target = self.config.get("last_target", "")
 
-        ttk.Label(frame, text="Source folder:").grid(
+        ttk.Label(frame, text="Quellordner:").grid(
             row=0, column=0, padx=6, pady=(8, 4), sticky="w"
         )
         self.source_var = tk.StringVar(value=last_source)
         entry_source = ttk.Entry(frame, textvariable=self.source_var)
         entry_source.grid(row=0, column=1, padx=6, pady=(8, 4), sticky="ew")
-        btn_source = ttk.Button(frame, text="Browse…", command=self.browse_source)
+        btn_source = ttk.Button(frame, text="Durchsuchen…", command=self.browse_source)
         btn_source.grid(row=0, column=2, padx=6, pady=(8, 4))
 
-        ttk.Label(frame, text="Target folder:").grid(
+        ttk.Label(frame, text="Zielordner:").grid(
             row=1, column=0, padx=6, pady=4, sticky="w"
         )
         self.target_var = tk.StringVar(value=last_target)
         entry_target = ttk.Entry(frame, textvariable=self.target_var)
         entry_target.grid(row=1, column=1, padx=6, pady=4, sticky="ew")
-        btn_target = ttk.Button(frame, text="Browse…", command=self.browse_target)
+        btn_target = ttk.Button(frame, text="Durchsuchen…", command=self.browse_target)
         btn_target.grid(row=1, column=2, padx=6, pady=4)
 
+        # Log-Toggle
         self.log_visible = False
         self.log_toggle_btn = ttk.Button(
             frame,
-            text="Show log ▾",
+            text="Log anzeigen ▾",
             command=self._toggle_log,
         )
         self.log_toggle_btn.grid(row=2, column=1, columnspan=2,
                                  padx=6, pady=(6, 2), sticky="e")
 
-        self.log_label = ttk.Label(frame, text="Log:")
+        # Log Widgets (anfangs versteckt)
+        self.log_label = ttk.Label(frame, text="Protokoll:")
 
         self.log_text = scrolledtext.ScrolledText(
             frame,
@@ -215,16 +230,17 @@ class PdfSortPrintGUI:
         self.log_text.tag_configure("ERROR", foreground="#d73a49")
         self.log_text.tag_configure("WARN", foreground="#b08800")
 
+        # Buttons
         btn_frame = ttk.Frame(frame)
         btn_frame.grid(row=4, column=0, columnspan=3, pady=(8, 8), sticky="e")
         btn_frame.columnconfigure(0, weight=1)
 
-        btn_sort = ttk.Button(btn_frame, text="Sort only", command=self.on_sort_only_clicked)
+        btn_sort = ttk.Button(btn_frame, text="Nur sortieren", command=self.on_sort_only_clicked)
         btn_sort.grid(row=0, column=0, padx=(0, 8))
 
         btn_print = ttk.Button(
             btn_frame,
-            text="Sort & print",
+            text="Sortieren & drucken",
             style="Accent.TButton",
             command=self.on_print_clicked,
         )
@@ -233,7 +249,11 @@ class PdfSortPrintGUI:
         if not WINDOWS or print_module is None:
             btn_print.state(["disabled"])
 
-        self._log("Ready.")
+        self._log("Bereit.")
+
+    # ---------------------------------------------------------
+    # Log-Handling
+    # ---------------------------------------------------------
 
     def _show_log_widgets(self):
         if not self.log_visible:
@@ -241,14 +261,14 @@ class PdfSortPrintGUI:
             self.log_text.grid(row=3, column=1, columnspan=2,
                                padx=6, pady=(4, 4), sticky="nsew")
             self.log_visible = True
-            self.log_toggle_btn.config(text="Hide log ▴")
+            self.log_toggle_btn.config(text="Log ausblenden ▴")
 
     def _hide_log_widgets(self):
         if self.log_visible:
             self.log_label.grid_remove()
             self.log_text.grid_remove()
             self.log_visible = False
-            self.log_toggle_btn.config(text="Show log ▾")
+            self.log_toggle_btn.config(text="Log anzeigen ▾")
 
     def _toggle_log(self):
         if self.log_visible:
@@ -256,116 +276,128 @@ class PdfSortPrintGUI:
         else:
             self._show_log_widgets()
 
+    # ---------------------------------------------------------
+    # Datei-Dialoge
+    # ---------------------------------------------------------
+
     def browse_source(self):
-        path = filedialog.askdirectory(title="Select source folder")
+        path = filedialog.askdirectory(title="Quellordner auswählen")
         if path:
             self.source_var.set(path)
-            self._log(f"Source set to: {path}")
+            self._log(f"Quellordner gesetzt: {path}")
 
     def browse_target(self):
-        path = filedialog.askdirectory(title="Select target folder")
+        path = filedialog.askdirectory(title="Zielordner auswählen")
         if path:
             self.target_var.set(path)
-            self._log(f"Target set to: {path}")
+            self._log(f"Zielordner gesetzt: {path}")
 
+    # ---------------------------------------------------------
+    # Nur sortieren
+    # ---------------------------------------------------------
 
     def on_sort_only_clicked(self):
         source, target = self._validate_paths()
         if not source:
             return
 
-        self._set_status("Sorting and imposing pages …")
-        self._log(f"Starting sort-only run from '{source}' to '{target}'")
+        self._set_status("Seiten werden sortiert und montiert …")
+        self._log(f"Starte »Nur sortieren« von '{source}' nach '{target}'")
         self._start_progress()
         self.root.update_idletasks()
 
         try:
             pages_by_size = collect_pages_by_size(source)
-            self._log("Collected pages by size.")
+            self._log("Seiten nach Format gesammelt.")
             output_files = write_imposed_pdfs(pages_by_size, target)
-            self._log(f"Created output PDFs: {output_files}")
+            self._log(f"Ausgabe-PDFs erstellt: {output_files}")
         except Exception as e:
             self._stop_progress()
-            self._set_status("Error while sorting.")
-            self._log(f"Error while creating output PDFs: {e}", level="ERROR")
-            messagebox.showerror("Error", f"Error while creating output PDFs:\n{e}")
+            self._set_status("Fehler beim Sortieren.")
+            self._log(f"Fehler beim Erstellen der Ausgabe-PDFs: {e}", level="ERROR")
+            messagebox.showerror("Fehler", f"Fehler beim Erstellen der Ausgabe-PDFs:\n{e}")
             return
 
         self._stop_progress()
 
         if not output_files:
-            self._set_status("No pages to process.")
-            self._log("No pages found to process.", level="WARN")
-            messagebox.showinfo("Info", "No pages found to process.")
+            self._set_status("Keine Seiten zu verarbeiten.")
+            self._log("Keine Seiten gefunden, die verarbeitet werden können.", level="WARN")
+            messagebox.showinfo("Info", "Keine Seiten gefunden, die verarbeitet werden können.")
             return
 
         self._save_current_config()
 
-        self._set_status("Sorting finished (no printing).")
-        self._log("Sorting finished successfully (no printing).")
+        self._set_status("Sortieren abgeschlossen (kein Druck).")
+        self._log("Sortieren erfolgreich abgeschlossen (kein Druck).")
         messagebox.showinfo(
-            "Sorting only",
-            "PDFs created successfully.\n(No printing performed.)"
+            "Nur sortieren",
+            "Ausgabe-PDFs wurden erfolgreich erstellt.\nEs wurde nichts gedruckt."
         )
 
+    # ---------------------------------------------------------
+    # Sortieren & Drucken
+    # ---------------------------------------------------------
 
     def on_print_clicked(self):
         source, target = self._validate_paths()
         if not source:
             return
 
-        self._set_status("Sorting and imposing pages …")
-        self._log(f"Starting sort & print run from '{source}' to '{target}'")
+        self._set_status("Seiten werden sortiert und montiert …")
+        self._log(f"Starte »Sortieren & drucken« von '{source}' nach '{target}'")
         self._start_progress()
         self.root.update_idletasks()
 
         try:
             pages_by_size = collect_pages_by_size(source)
-            self._log("Collected pages by size.")
+            self._log("Seiten nach Format gesammelt.")
             output_files = write_imposed_pdfs(pages_by_size, target)
-            self._log(f"Created output PDFs: {output_files}")
+            self._log(f"Ausgabe-PDFs erstellt: {output_files}")
         except Exception as e:
             self._stop_progress()
-            self._set_status("Error while sorting.")
-            self._log(f"Error while creating output PDFs: {e}", level="ERROR")
-            messagebox.showerror("Error", f"Error while creating output PDFs:\n{e}")
+            self._set_status("Fehler beim Sortieren.")
+            self._log(f"Fehler beim Erstellen der Ausgabe-PDFs: {e}", level="ERROR")
+            messagebox.showerror("Fehler", f"Fehler beim Erstellen der Ausgabe-PDFs:\n{e}")
             return
 
         if not output_files:
             self._stop_progress()
-            self._set_status("No pages to process.")
-            self._log("No pages found to process.", level="WARN")
-            messagebox.showinfo("Info", "No pages found to process.")
+            self._set_status("Keine Seiten zu verarbeiten.")
+            self._log("Keine Seiten gefunden, die verarbeitet werden können.", level="WARN")
+            messagebox.showinfo("Info", "Keine Seiten gefunden, die verarbeitet werden können.")
             return
 
         printer_settings = self._build_printer_settings()
-        self._log(f"Printer settings: {printer_settings}")
+        self._log(f"Drucker-Einstellungen: {printer_settings}")
 
         if WINDOWS and print_module is not None and printer_settings:
-            self._set_status("Sending jobs to printers …")
+            self._set_status("Druckaufträge werden gesendet …")
             self.root.update_idletasks()
             try:
                 print_module.print_selected_formats(output_files, printer_settings)
-                self._set_status("Jobs sent to printers.")
-                self._log("Print jobs successfully sent.")
-                messagebox.showinfo("Done", "PDFs created and sent to printers.")
+                self._set_status("Druckaufträge gesendet.")
+                self._log("Druckaufträge erfolgreich gesendet.")
+                messagebox.showinfo("Fertig", "Ausgabe-PDFs wurden erstellt und an die Drucker gesendet.")
             except Exception as e:
-                self._set_status("Error while printing.")
-                self._log(f"Error while printing: {e}", level="ERROR")
-                messagebox.showerror("Error", f"Error while printing:\n{e}")
+                self._set_status("Fehler beim Drucken.")
+                self._log(f"Fehler beim Drucken: {e}", level="ERROR")
+                messagebox.showerror("Fehler", f"Fehler beim Drucken:\n{e}")
         else:
-            self._set_status("Sorting finished (printing not available).")
-            self._log("Printing not available on this system.", level="WARN")
+            self._set_status("Sortieren abgeschlossen (Druck nicht verfügbar).")
+            self._log("Drucken auf diesem System nicht verfügbar.", level="WARN")
             messagebox.showinfo(
                 "Info",
-                "PDFs created successfully.\n"
-                "Printing is only available on Windows with printer support."
+                "Ausgabe-PDFs wurden erfolgreich erstellt.\n"
+                "Drucken ist nur unter Windows mit eingerichtetem Drucker verfügbar."
             )
 
         self._stop_progress()
-
         self._save_current_config()
 
+    # ---------------------------------------------------------
+    # Konfiguration speichern / Fenster schließen
+    # ---------------------------------------------------------
 
     def _save_current_config(self):
         printers = {}
@@ -387,16 +419,19 @@ class PdfSortPrintGUI:
         finally:
             self.root.destroy()
 
+    # ---------------------------------------------------------
+    # Hilfsfunktionen
+    # ---------------------------------------------------------
 
     def _validate_paths(self):
         source = self.source_var.get().strip()
         target = self.target_var.get().strip()
 
         if not source or not os.path.isdir(source):
-            messagebox.showerror("Error", "Please select a valid source folder.")
+            messagebox.showerror("Fehler", "Bitte einen gültigen Quellordner auswählen.")
             return None, None
         if not target:
-            messagebox.showerror("Error", "Please select a target folder.")
+            messagebox.showerror("Fehler", "Bitte einen Zielordner auswählen.")
             return None, None
 
         return source, target
