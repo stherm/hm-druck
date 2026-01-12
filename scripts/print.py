@@ -6,6 +6,10 @@ if WINDOWS:
     import win32print
     import win32api
     import win32con
+else:
+    win32print = None
+    win32api = None
+    win32con = None
 
 
 def _print_pdf_windows(file_path, printer_name, orientation="landscape",
@@ -60,4 +64,47 @@ def _print_pdf_windows(file_path, printer_name, orientation="landscape",
         ".",
         0
     )
+
+
+def get_installed_printers():
+    """
+    Gibt eine Liste der installierten Druckernamen zurück.
+    """
+    if not WINDOWS:
+        return []
+
+    try:
+        flags = win32print.PRINTER_ENUM_LOCAL | win32print.PRINTER_ENUM_CONNECTIONS
+        printers = win32print.EnumPrinters(flags)
+        return sorted([p[2] for p in printers if len(p) > 2])
+    except Exception:
+        return []
+
+
+def print_selected_formats(output_files, printer_settings):
+    """
+    Druckt die generierten PDFs basierend auf den Einstellungen.
+
+    output_files: Dictionary { "A0": "/path/to/a0.pdf", "A4": ... }
+    printer_settings: Dictionary { "A0": { "printer_name": "...", "orientation": ... }, ... }
+    """
+    if not WINDOWS:
+        raise RuntimeError("Printing is only supported on Windows.")
+
+    for fmt, file_path in output_files.items():
+        if fmt not in printer_settings:
+            continue
+
+        settings = printer_settings[fmt]
+        printer_name = settings.get("printer_name")
+        if not printer_name:
+            continue
+
+        _print_pdf_windows(
+            file_path=file_path,
+            printer_name=printer_name,
+            orientation=settings.get("orientation", "landscape"),
+            print_quality=settings.get("print_quality", "medium"),
+            color=settings.get("color", True)
+        )
 
